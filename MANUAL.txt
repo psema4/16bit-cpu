@@ -1,0 +1,1402 @@
+================================================================================
+                          CPU-16 TECHNICAL REFERENCE MANUAL
+                                   Version 1.0
+                                  February 2026
+================================================================================
+
+
+TABLE OF CONTENTS
+
+SECTION 1: INTRODUCTION .................................................. 1
+SECTION 2: SYSTEM ARCHITECTURE ........................................... 3
+SECTION 3: INSTRUCTION SET REFERENCE ..................................... 8
+SECTION 4: PROGRAMMING EXAMPLES .......................................... 25
+SECTION 5: TECHNICAL SPECIFICATIONS ...................................... 30
+APPENDIX A: INSTRUCTION ENCODING ......................................... 32
+APPENDIX B: QUICK REFERENCE CARD ......................................... 35
+APPENDIX C: ERROR CODES AND TROUBLESHOOTING .............................. 37
+
+
+
+                                    SECTION 1
+                                  INTRODUCTION
+
+--------------------------------------------------------------------------------
+
+1.1  ABOUT THIS MANUAL
+
+     This manual provides complete technical documentation for the CPU-16
+     microprocessor system. It is intended for system programmers, hardware
+     engineers, and technical personnel who require detailed knowledge of
+     the CPU-16 architecture and instruction set.
+
+     The manual assumes familiarity with:
+       * Binary and hexadecimal number systems
+       * Basic computer architecture concepts
+       * Assembly language programming fundamentals
+
+1.2  MANUAL ORGANIZATION
+
+     SECTION 1 provides an overview of the CPU-16 system and this manual.
+
+     SECTION 2 describes the system architecture, including the register
+     set, memory organization, and status flags.
+
+     SECTION 3 contains detailed descriptions of all CPU-16 instructions,
+     including operation, encoding, and cycle timing.
+
+     SECTION 4 presents programming examples demonstrating common tasks
+     and programming techniques.
+
+     SECTION 5 lists complete technical specifications.
+
+     APPENDIX A details instruction encoding formats.
+
+     APPENDIX B provides a quick reference card for all instructions.
+
+     APPENDIX C contains troubleshooting information and error codes.
+
+1.3  SYSTEM OVERVIEW
+
+     The CPU-16 is a 16-bit microprocessor featuring:
+
+       * 16-bit data path and arithmetic logic unit (ALU)
+       * Eight 16-bit general-purpose registers (R0-R7)
+       * 64 kilobytes of addressable memory
+       * 23 instruction opcodes
+       * Hardware stack support
+       * Three condition flags (Zero, Negative, Overflow)
+       * Simple, orthogonal instruction set
+
+     The CPU-16 is designed for ease of programming and efficient execution
+     of common operations. The instruction set provides all necessary
+     operations for general-purpose computing applications.
+
+1.4  NOTATION CONVENTIONS
+
+     Throughout this manual, the following notation is used:
+
+       Rn          Register n, where n = 0 to 7
+       [addr]      Contents of memory at address addr
+       #value      Immediate value (literal constant)
+       0xNNNN      Hexadecimal number
+       NNNN        Decimal number (unless otherwise noted)
+       <-          Assignment operator (destination <- source)
+
+     Binary values are shown with 'b' suffix: 1010b
+     Hexadecimal values are shown with '0x' prefix: 0x1A2B
+
+1.5  REGISTER NAMING
+
+     The CPU-16 provides eight general-purpose registers:
+
+       R0, R1, R2, R3, R4, R5, R6, R7
+
+     All registers are 16 bits wide and may be used interchangeably for
+     most operations. There are no dedicated accumulator or index registers.
+
+     NOTE: While all registers are general-purpose, programmers may adopt
+           conventions such as using R7 as a frame pointer or R6 for
+           temporary values. Such conventions are not enforced by hardware.
+
+
+                                    SECTION 2
+                               SYSTEM ARCHITECTURE
+
+--------------------------------------------------------------------------------
+
+2.1  PROCESSOR REGISTERS
+
+     The CPU-16 contains the following programmer-accessible registers:
+
+     GENERAL-PURPOSE REGISTERS (R0-R7)
+       Eight 16-bit registers for data storage and manipulation.
+       All arithmetic and logical operations use these registers.
+
+     PROGRAM COUNTER (PC)
+       16-bit register containing the address of the next instruction
+       to be executed. Automatically incremented after each instruction
+       fetch. Modified by jump, call, and return instructions.
+
+     STACK POINTER (SP)
+       16-bit register pointing to the top of the stack in memory.
+       Decremented by PUSH and CALL operations.
+       Incremented by POP and RET operations.
+       The stack grows downward (toward lower addresses).
+
+     FLAGS REGISTER
+       16-bit register containing condition flags set by arithmetic
+       and logical operations. Only the lower 3 bits are currently used:
+
+       Bit 0: ZERO (Z)      - Set when result equals zero
+       Bit 1: NEGATIVE (N)  - Set when result is negative (bit 15 = 1)
+       Bit 2: OVERFLOW (O)  - Set when signed arithmetic overflow occurs
+       Bits 3-15: Reserved for future use
+
+2.2  MEMORY ORGANIZATION
+
+     The CPU-16 uses a linear address space of 65,536 bytes (64K).
+     Memory addresses range from 0x0000 to 0xFFFF.
+
+     WORD ALIGNMENT
+       All instructions and data words are 16 bits (2 bytes).
+       Memory addresses should be even-aligned for optimal performance.
+       The CPU stores data in little-endian format:
+         - Low byte at lower address
+         - High byte at higher address
+
+     MEMORY MAP (Typical Configuration)
+       0x0000 - 0x00FF    Interrupt vectors (reserved)
+       0x0100 - 0x7FFF    Program code and constants
+       0x8000 - 0xEFFF    Data and heap
+       0xF000 - 0xFFFF    Stack area
+
+     NOTE: The memory map shown above is a suggested convention.
+           The CPU-16 does not enforce any memory segmentation.
+
+2.3  INSTRUCTION FORMATS
+
+     The CPU-16 uses two instruction formats:
+
+     FORMAT R (Register Format) - 16 bits, single word
+       +-----+-----+-----+-------+
+       |  OP | DST | SRC |  IMM5 |
+       +-----+-----+-----+-------+
+       15  11 10  8  7  5  4    0
+
+       OP    - 5-bit operation code (bits 15-11)
+       DST   - 3-bit destination register (bits 10-8)
+       SRC   - 3-bit source register (bits 7-5)
+       IMM5  - 5-bit immediate value (bits 4-0)
+
+     FORMAT J (Jump Format) - 16 bits, single word
+       +-----+---------------+
+       |  OP |    ADDRESS    |
+       +-----+---------------+
+       15  11 10            0
+
+       OP    - 5-bit operation code (bits 15-11)
+       ADDRESS - 11-bit jump address (bits 10-0)
+
+     TWO-WORD INSTRUCTIONS
+       LOAD and CALL are two-word instructions:
+         Word 1: Instruction encoding
+         Word 2: 16-bit immediate value or address
+
+2.4  CONDITION FLAGS
+
+     The FLAGS register contains three condition flags:
+
+     ZERO FLAG (Z)
+       Set to 1 when an arithmetic or logical operation produces
+       a zero result. Used by JZ (Jump if Zero) and JNZ (Jump if
+       Not Zero) instructions.
+
+     NEGATIVE FLAG (N)
+       Set to 1 when an arithmetic or logical operation produces
+       a negative result (bit 15 of result = 1). Used by JN
+       (Jump if Negative) instruction.
+
+     OVERFLOW FLAG (O)
+       Set to 1 when a signed arithmetic operation produces a result
+       that cannot be represented in 16 bits. Occurs when:
+         - Adding two positive numbers yields a negative result
+         - Adding two negative numbers yields a positive result
+         - Subtracting a negative from a positive yields negative
+         - Subtracting a positive from a negative yields positive
+
+     FLAGS AFFECTED BY INSTRUCTIONS
+       The following instructions modify flags: ADD, SUB, AND, OR,
+       XOR, NOT, SHL, SHR, CMP
+
+       The following instructions do NOT modify flags: MOV, LOAD,
+       LDR, STR, PUSH, POP, JMP, JZ, JNZ, JN, CALL, RET, NOP, HALT
+
+2.5  STACK OPERATION
+
+     The CPU-16 provides hardware stack support for subroutine calls
+     and temporary data storage.
+
+     STACK CHARACTERISTICS
+       - Grows downward (toward address 0x0000)
+       - SP points to the last item pushed
+       - Each stack entry is 16 bits (2 bytes)
+
+     STACK OPERATIONS
+       PUSH Rn:  SP <- SP - 2
+                 [SP] <- Rn
+
+       POP Rn:   Rn <- [SP]
+                 SP <- SP + 2
+
+       CALL:     SP <- SP - 2
+                 [SP] <- PC
+                 PC <- target
+
+       RET:      PC <- [SP]
+                 SP <- SP + 2
+
+     CAUTION: The programmer is responsible for:
+              - Initializing SP before using stack operations
+              - Ensuring stack does not overflow into code/data areas
+              - Balancing PUSH/POP and CALL/RET operations
+
+2.6  INSTRUCTION EXECUTION CYCLE
+
+     Each instruction executes in the following phases:
+
+     1. FETCH
+        Read instruction word from memory at address PC
+        Increment PC by 2
+
+     2. DECODE
+        Extract opcode, register numbers, and immediate values
+        from instruction word
+
+     3. EXECUTE
+        Perform the operation specified by the opcode
+        Update registers, memory, or PC as required
+        Set condition flags if applicable
+
+     4. REPEAT
+        If not halted, return to step 1
+
+     TIMING
+       Most instructions execute in 1 machine cycle.
+       Memory access instructions (LDR, STR) may require additional
+       cycles depending on memory speed.
+
+
+                                    SECTION 3
+                            INSTRUCTION SET REFERENCE
+
+--------------------------------------------------------------------------------
+
+3.1  INSTRUCTION SET SUMMARY
+
+     The CPU-16 instruction set consists of 23 operations organized into
+     the following categories:
+
+     DATA MOVEMENT
+       NOP     - No operation
+       LOAD    - Load immediate value into register
+       MOV     - Move data between registers
+       LDR     - Load from memory
+       STR     - Store to memory
+
+     ARITHMETIC
+       ADD     - Add registers
+       SUB     - Subtract registers
+       CMP     - Compare registers
+
+     LOGICAL
+       AND     - Bitwise AND
+       OR      - Bitwise OR
+       XOR     - Bitwise exclusive OR
+       NOT     - Bitwise NOT (complement)
+
+     SHIFT
+       SHL     - Shift left logical
+       SHR     - Shift right logical
+
+     CONTROL FLOW
+       JMP     - Unconditional jump
+       JZ      - Jump if zero
+       JNZ     - Jump if not zero
+       JN      - Jump if negative
+
+     SUBROUTINE
+       CALL    - Call subroutine
+       RET     - Return from subroutine
+
+     STACK
+       PUSH    - Push register onto stack
+       POP     - Pop from stack into register
+
+     SYSTEM
+       HALT    - Halt processor
+
+3.2  INSTRUCTION DESCRIPTIONS
+
+     The following pages provide detailed descriptions of each instruction.
+     Each entry includes:
+       - Instruction mnemonic and operands
+       - Operation performed
+       - Flags affected
+       - Encoding format
+       - Example usage
+
+--------------------------------------------------------------------------------
+NOP - No Operation
+--------------------------------------------------------------------------------
+
+SYNTAX:       NOP
+
+OPERATION:    No operation is performed. PC is incremented.
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x00
+              [00000][000][000][00000]
+
+CYCLES:       1
+
+DESCRIPTION:  NOP performs no operation. It may be used for timing delays
+              or as a placeholder in code.
+
+EXAMPLE:      NOP              ; Do nothing for one cycle
+
+--------------------------------------------------------------------------------
+LOAD - Load Immediate Value
+--------------------------------------------------------------------------------
+
+SYNTAX:       LOAD Rd, #value
+
+OPERATION:    Rd <- value
+
+FLAGS:        None affected
+
+ENCODING:     Format R (two-word instruction)
+              Opcode: 0x01
+              Word 1: [00001][Rd][000][00000]
+              Word 2: 16-bit immediate value
+
+CYCLES:       1
+
+DESCRIPTION:  LOAD places a 16-bit immediate value into the destination
+              register. This is a two-word instruction; the second word
+              contains the immediate value.
+
+EXAMPLE:      LOAD R0, 1000    ; R0 <- 1000
+              LOAD R3, 0xFF00  ; R3 <- 0xFF00
+
+--------------------------------------------------------------------------------
+MOV - Move Register to Register
+--------------------------------------------------------------------------------
+
+SYNTAX:       MOV Rd, Rs
+
+OPERATION:    Rd <- Rs
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x02
+              [00010][Rd][Rs][00000]
+
+CYCLES:       1
+
+DESCRIPTION:  MOV copies the contents of the source register to the
+              destination register. The source register is unchanged.
+
+EXAMPLE:      MOV R1, R0       ; R1 <- R0
+              MOV R7, R3       ; R7 <- R3
+
+--------------------------------------------------------------------------------
+ADD - Add Registers
+--------------------------------------------------------------------------------
+
+SYNTAX:       ADD Rd, Rs
+
+OPERATION:    Rd <- Rd + Rs
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  ADD adds the source register to the destination register
+              and stores the result in the destination register.
+              Flags are set based on the result.
+
+ENCODING:     Format R
+              Opcode: 0x03
+              [00011][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      ADD R0, R1       ; R0 <- R0 + R1
+              ADD R2, R2       ; R2 <- R2 + R2 (double R2)
+
+--------------------------------------------------------------------------------
+SUB - Subtract Registers
+--------------------------------------------------------------------------------
+
+SYNTAX:       SUB Rd, Rs
+
+OPERATION:    Rd <- Rd - Rs
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  SUB subtracts the source register from the destination
+              register and stores the result in the destination register.
+              Flags are set based on the result.
+
+ENCODING:     Format R
+              Opcode: 0x04
+              [00100][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      SUB R0, R1       ; R0 <- R0 - R1
+              SUB R3, R3       ; R3 <- 0 (clear R3)
+
+--------------------------------------------------------------------------------
+AND - Bitwise AND
+--------------------------------------------------------------------------------
+
+SYNTAX:       AND Rd, Rs
+
+OPERATION:    Rd <- Rd AND Rs
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  AND performs a bitwise logical AND between the destination
+              and source registers. The result is stored in the destination
+              register.
+
+ENCODING:     Format R
+              Opcode: 0x05
+              [00101][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      AND R0, R1       ; R0 <- R0 AND R1
+              LOAD R2, 0x00FF
+              AND R0, R2       ; Mask lower byte of R0
+
+--------------------------------------------------------------------------------
+OR - Bitwise OR
+--------------------------------------------------------------------------------
+
+SYNTAX:       OR Rd, Rs
+
+OPERATION:    Rd <- Rd OR Rs
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  OR performs a bitwise logical OR between the destination
+              and source registers. The result is stored in the destination
+              register.
+
+ENCODING:     Format R
+              Opcode: 0x06
+              [00110][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      OR R0, R1        ; R0 <- R0 OR R1
+              OR R2, R2        ; Test if R2 is zero (sets flags)
+
+--------------------------------------------------------------------------------
+XOR - Bitwise Exclusive OR
+--------------------------------------------------------------------------------
+
+SYNTAX:       XOR Rd, Rs
+
+OPERATION:    Rd <- Rd XOR Rs
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  XOR performs a bitwise logical exclusive OR between the
+              destination and source registers. The result is stored in
+              the destination register.
+
+ENCODING:     Format R
+              Opcode: 0x07
+              [00111][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      XOR R0, R1       ; R0 <- R0 XOR R1
+              XOR R3, R3       ; R3 <- 0 (clear register)
+
+--------------------------------------------------------------------------------
+NOT - Bitwise NOT (Complement)
+--------------------------------------------------------------------------------
+
+SYNTAX:       NOT Rd
+
+OPERATION:    Rd <- NOT Rd
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  NOT performs a bitwise logical complement (one's complement)
+              of the destination register. All bits are inverted.
+
+ENCODING:     Format R
+              Opcode: 0x08
+              [01000][Rd][000][00000]
+
+CYCLES:       1
+
+EXAMPLE:      NOT R0           ; R0 <- NOT R0
+              LOAD R1, 0x00FF
+              NOT R1           ; R1 <- 0xFF00
+
+--------------------------------------------------------------------------------
+SHL - Shift Left Logical
+--------------------------------------------------------------------------------
+
+SYNTAX:       SHL Rd, #count
+
+OPERATION:    Rd <- Rd << count
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  SHL shifts the destination register left by the specified
+              number of bit positions. Zeros are shifted in from the right.
+              The count is a 5-bit immediate value (0-31).
+
+ENCODING:     Format R
+              Opcode: 0x09
+              [01001][Rd][000][count]
+
+CYCLES:       1
+
+EXAMPLE:      SHL R0, 1        ; R0 <- R0 << 1 (multiply by 2)
+              SHL R1, 4        ; R1 <- R1 << 4 (multiply by 16)
+
+--------------------------------------------------------------------------------
+SHR - Shift Right Logical
+--------------------------------------------------------------------------------
+
+SYNTAX:       SHR Rd, #count
+
+OPERATION:    Rd <- Rd >> count
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  SHR shifts the destination register right by the specified
+              number of bit positions. Zeros are shifted in from the left.
+              The count is a 5-bit immediate value (0-31).
+
+ENCODING:     Format R
+              Opcode: 0x0A
+              [01010][Rd][000][count]
+
+CYCLES:       1
+
+EXAMPLE:      SHR R0, 1        ; R0 <- R0 >> 1 (divide by 2)
+              SHR R2, 8        ; R2 <- R2 >> 8 (extract high byte)
+
+--------------------------------------------------------------------------------
+CMP - Compare Registers
+--------------------------------------------------------------------------------
+
+SYNTAX:       CMP Rd, Rs
+
+OPERATION:    Rd - Rs (result discarded, flags set)
+
+FLAGS:        Z, N, O
+
+DESCRIPTION:  CMP subtracts the source register from the destination
+              register and sets flags based on the result. The result
+              is discarded; neither register is modified. Used before
+              conditional jumps.
+
+ENCODING:     Format R
+              Opcode: 0x0B
+              [01011][Rd][Rs][00000]
+
+CYCLES:       1
+
+EXAMPLE:      CMP R0, R1       ; Compare R0 with R1
+              JZ equal         ; Jump if R0 == R1
+              CMP R2, R3       ; Compare R2 with R3
+              JN less          ; Jump if R2 < R3
+
+--------------------------------------------------------------------------------
+JMP - Unconditional Jump
+--------------------------------------------------------------------------------
+
+SYNTAX:       JMP address
+
+OPERATION:    PC <- address
+
+FLAGS:        None affected
+
+ENCODING:     Format J
+              Opcode: 0x0C
+              [01100][address]
+
+CYCLES:       1
+
+DESCRIPTION:  JMP transfers control to the specified address. The address
+              is an 11-bit value (0-2047). For addresses beyond 2047,
+              use indirect jumps through registers.
+
+EXAMPLE:      JMP 100          ; Jump to address 100
+              JMP loop         ; Jump to label 'loop'
+
+--------------------------------------------------------------------------------
+JZ - Jump if Zero
+--------------------------------------------------------------------------------
+
+SYNTAX:       JZ address
+
+OPERATION:    If Z flag is set, PC <- address
+
+FLAGS:        None affected
+
+ENCODING:     Format J
+              Opcode: 0x0D
+              [01101][address]
+
+CYCLES:       1
+
+DESCRIPTION:  JZ transfers control to the specified address if the Zero
+              flag is set. Used after CMP or arithmetic operations to
+              test for equality or zero result.
+
+EXAMPLE:      CMP R0, R1       ; Compare R0 with R1
+              JZ equal         ; Jump if equal
+              SUB R2, R2       ; R2 <- 0
+              JZ always        ; Always jumps (Z flag set)
+
+--------------------------------------------------------------------------------
+JNZ - Jump if Not Zero
+--------------------------------------------------------------------------------
+
+SYNTAX:       JNZ address
+
+OPERATION:    If Z flag is clear, PC <- address
+
+FLAGS:        None affected
+
+ENCODING:     Format J
+              Opcode: 0x0E
+              [01110][address]
+
+CYCLES:       1
+
+DESCRIPTION:  JNZ transfers control to the specified address if the Zero
+              flag is clear. Used after CMP or arithmetic operations to
+              test for inequality or non-zero result.
+
+EXAMPLE:      CMP R0, R1       ; Compare R0 with R1
+              JNZ notequal     ; Jump if not equal
+              SUB R2, R3       ; R2 <- R2 - R3
+              JNZ loop         ; Loop while R2 != 0
+
+--------------------------------------------------------------------------------
+JN - Jump if Negative
+--------------------------------------------------------------------------------
+
+SYNTAX:       JN address
+
+OPERATION:    If N flag is set, PC <- address
+
+FLAGS:        None affected
+
+ENCODING:     Format J
+              Opcode: 0x0F
+              [01111][address]
+
+CYCLES:       1
+
+DESCRIPTION:  JN transfers control to the specified address if the
+              Negative flag is set. Used after CMP or arithmetic
+              operations to test for negative results or less-than
+              conditions.
+
+EXAMPLE:      CMP R0, R1       ; Compare R0 with R1
+              JN less          ; Jump if R0 < R1
+              SUB R2, R3       ; R2 <- R2 - R3
+              JN negative      ; Jump if result negative
+
+--------------------------------------------------------------------------------
+LDR - Load from Memory
+--------------------------------------------------------------------------------
+
+SYNTAX:       LDR Rd, Rs
+
+OPERATION:    Rd <- [Rs]
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x10
+              [10000][Rd][Rs][00000]
+
+CYCLES:       1+
+
+DESCRIPTION:  LDR loads a 16-bit value from memory at the address
+              contained in the source register into the destination
+              register. This is indirect addressing.
+
+EXAMPLE:      LOAD R1, 1000    ; R1 <- 1000 (address)
+              LDR R0, R1       ; R0 <- [1000] (load from memory)
+              LOAD R2, 2000
+              LDR R3, R2       ; R3 <- [2000]
+
+--------------------------------------------------------------------------------
+STR - Store to Memory
+--------------------------------------------------------------------------------
+
+SYNTAX:       STR Rd, Rs
+
+OPERATION:    [Rd] <- Rs
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x11
+              [10001][Rd][Rs][00000]
+
+CYCLES:       1+
+
+DESCRIPTION:  STR stores the value in the source register to memory at
+              the address contained in the destination register. This is
+              indirect addressing.
+
+EXAMPLE:      LOAD R1, 1000    ; R1 <- 1000 (address)
+              LOAD R0, 42      ; R0 <- 42 (value)
+              STR R1, R0       ; [1000] <- 42 (store to memory)
+
+--------------------------------------------------------------------------------
+PUSH - Push Register onto Stack
+--------------------------------------------------------------------------------
+
+SYNTAX:       PUSH Rs
+
+OPERATION:    SP <- SP - 2
+              [SP] <- Rs
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x12
+              [10010][Rs][000][00000]
+
+CYCLES:       1+
+
+DESCRIPTION:  PUSH decrements the stack pointer by 2 and stores the
+              source register value at the new stack pointer location.
+              Used to save register values.
+
+EXAMPLE:      PUSH R0          ; Save R0 on stack
+              PUSH R1          ; Save R1 on stack
+              ; ... do work ...
+              POP R1           ; Restore R1
+              POP R0           ; Restore R0
+
+--------------------------------------------------------------------------------
+POP - Pop from Stack into Register
+--------------------------------------------------------------------------------
+
+SYNTAX:       POP Rd
+
+OPERATION:    Rd <- [SP]
+              SP <- SP + 2
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x13
+              [10011][Rd][000][00000]
+
+CYCLES:       1+
+
+DESCRIPTION:  POP loads the value at the current stack pointer into the
+              destination register and increments the stack pointer by 2.
+              Used to restore register values.
+
+EXAMPLE:      POP R0           ; Restore R0 from stack
+              POP R1           ; Restore R1 from stack
+
+--------------------------------------------------------------------------------
+CALL - Call Subroutine
+--------------------------------------------------------------------------------
+
+SYNTAX:       CALL address
+
+OPERATION:    SP <- SP - 2
+              [SP] <- PC
+              PC <- address
+
+FLAGS:        None affected
+
+ENCODING:     Format R (two-word instruction)
+              Opcode: 0x14
+              Word 1: [10100][000][000][00000]
+              Word 2: 16-bit target address
+
+CYCLES:       1+
+
+DESCRIPTION:  CALL pushes the return address (current PC) onto the stack
+              and transfers control to the specified address. This is a
+              two-word instruction; the second word contains the full
+              16-bit target address.
+
+EXAMPLE:      CALL subroutine  ; Call subroutine
+              ; ... execution continues here after RET ...
+
+subroutine:
+              ; ... subroutine code ...
+              RET              ; Return to caller
+
+--------------------------------------------------------------------------------
+RET - Return from Subroutine
+--------------------------------------------------------------------------------
+
+SYNTAX:       RET
+
+OPERATION:    PC <- [SP]
+              SP <- SP + 2
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x15
+              [10101][000][000][00000]
+
+CYCLES:       1+
+
+DESCRIPTION:  RET pops the return address from the stack and transfers
+              control to that address. Used to return from subroutines
+              called by CALL.
+
+EXAMPLE:      subroutine:
+                  PUSH R0      ; Save registers
+                  ; ... do work ...
+                  POP R0       ; Restore registers
+                  RET          ; Return to caller
+
+--------------------------------------------------------------------------------
+HALT - Halt Processor
+--------------------------------------------------------------------------------
+
+SYNTAX:       HALT
+
+OPERATION:    Stop instruction execution
+
+FLAGS:        None affected
+
+ENCODING:     Format R
+              Opcode: 0x16
+              [10110][000][000][00000]
+
+CYCLES:       1
+
+DESCRIPTION:  HALT stops the processor. No further instructions are
+              executed until the processor is reset. Used to terminate
+              programs or signal completion.
+
+EXAMPLE:      ; ... program code ...
+              HALT             ; End of program
+
+
+                                    SECTION 4
+                              PROGRAMMING EXAMPLES
+
+--------------------------------------------------------------------------------
+
+4.1  BASIC OPERATIONS
+
+     Example 4.1.1: Adding Two Numbers
+
+         ; Add two numbers and store result
+         LOAD R0, 100         ; R0 <- 100
+         LOAD R1, 200         ; R1 <- 200
+         ADD R0, R1           ; R0 <- R0 + R1 (300)
+         HALT
+
+     Example 4.1.2: Clearing a Register
+
+         ; Three ways to clear a register to zero
+         SUB R0, R0           ; R0 <- R0 - R0 (fastest)
+         XOR R1, R1           ; R1 <- R1 XOR R1
+         LOAD R2, 0           ; R2 <- 0 (uses 2 words)
+
+     Example 4.1.3: Copying a Value
+
+         LOAD R0, 1234        ; R0 <- 1234
+         MOV R1, R0           ; R1 <- R0 (copy value)
+
+4.2  MEMORY OPERATIONS
+
+     Example 4.2.1: Loading from Memory
+
+         ; Load value from memory address 1000
+         LOAD R1, 1000        ; R1 <- 1000 (address)
+         LDR R0, R1           ; R0 <- [1000] (load value)
+
+     Example 4.2.2: Storing to Memory
+
+         ; Store value 42 to memory address 2000
+         LOAD R0, 42          ; R0 <- 42 (value)
+         LOAD R1, 2000        ; R1 <- 2000 (address)
+         STR R1, R0           ; [2000] <- 42
+
+     Example 4.2.3: Copying Memory
+
+         ; Copy value from address 1000 to address 2000
+         LOAD R1, 1000        ; R1 <- source address
+         LDR R0, R1           ; R0 <- [1000]
+         LOAD R2, 2000        ; R2 <- destination address
+         STR R2, R0           ; [2000] <- R0
+
+4.3  LOOPS AND CONTROL FLOW
+
+     Example 4.3.1: Simple Loop (Count Down)
+
+         ; Count from 10 down to 0
+         LOAD R0, 10          ; R0 <- 10 (counter)
+loop:
+         ; ... do work here ...
+         LOAD R1, 1           ; R1 <- 1
+         SUB R0, R1           ; R0 <- R0 - 1
+         JNZ loop             ; Loop if R0 != 0
+         HALT
+
+     Example 4.3.2: Conditional Execution
+
+         ; If R0 > R1, set R2 = 1, else set R2 = 0
+         CMP R0, R1           ; Compare R0 with R1
+         JN else_branch       ; Jump if R0 < R1
+         JZ else_branch       ; Jump if R0 == R1
+         LOAD R2, 1           ; R0 > R1, so R2 <- 1
+         JMP endif
+else_branch:
+         LOAD R2, 0           ; R0 <= R1, so R2 <- 0
+endif:
+         HALT
+
+     Example 4.3.3: Sum of Numbers (1 + 2 + ... + N)
+
+         ; Calculate sum of 1 to 100
+         LOAD R0, 0           ; R0 <- 0 (accumulator)
+         LOAD R1, 1           ; R1 <- 1 (counter)
+         LOAD R2, 100         ; R2 <- 100 (limit)
+loop:
+         ADD R0, R1           ; R0 <- R0 + R1
+         LOAD R3, 1           ; R3 <- 1
+         ADD R1, R3           ; R1 <- R1 + 1
+         CMP R1, R2           ; Compare counter with limit
+         JNZ loop             ; Continue if not equal
+         ADD R0, R1           ; Add final value
+         HALT                 ; R0 contains sum (5050)
+
+4.4  SUBROUTINES
+
+     Example 4.4.1: Simple Subroutine
+
+         ; Main program
+         LOAD R0, 10          ; R0 <- 10
+         LOAD R1, 20          ; R1 <- 20
+         CALL add_numbers     ; Call subroutine
+         ; R0 now contains 30
+         HALT
+
+add_numbers:
+         ADD R0, R1           ; R0 <- R0 + R1
+         RET                  ; Return to caller
+
+     Example 4.4.2: Subroutine with Register Preservation
+
+         ; Main program
+         LOAD R0, 5           ; R0 <- 5
+         CALL double_value    ; Call subroutine
+         ; R0 now contains 10
+         HALT
+
+double_value:
+         PUSH R1              ; Save R1
+         MOV R1, R0           ; R1 <- R0
+         ADD R0, R1           ; R0 <- R0 + R1 (double)
+         POP R1               ; Restore R1
+         RET
+
+     Example 4.4.3: Nested Subroutine Calls
+
+         ; Main program
+         LOAD R0, 3           ; R0 <- 3
+         CALL triple          ; Call triple
+         ; R0 now contains 9
+         HALT
+
+triple:
+         PUSH R0              ; Save original value
+         CALL double          ; R0 <- R0 * 2
+         POP R1               ; R1 <- original value
+         ADD R0, R1           ; R0 <- R0 + original
+         RET
+
+double:
+         PUSH R1              ; Save R1
+         MOV R1, R0           ; R1 <- R0
+         ADD R0, R1           ; R0 <- R0 + R1
+         POP R1               ; Restore R1
+         RET
+
+4.5  BIT MANIPULATION
+
+     Example 4.5.1: Testing a Bit
+
+         ; Test if bit 7 of R0 is set
+         LOAD R1, 0x0080      ; R1 <- 0x0080 (bit 7 mask)
+         AND R1, R0           ; R1 <- R0 AND 0x0080
+         JZ bit_clear         ; Jump if bit 7 is clear
+         ; Bit 7 is set
+         JMP done
+bit_clear:
+         ; Bit 7 is clear
+done:
+         HALT
+
+     Example 4.5.2: Setting and Clearing Bits
+
+         ; Set bit 5 of R0
+         LOAD R1, 0x0020      ; R1 <- 0x0020 (bit 5 mask)
+         OR R0, R1            ; R0 <- R0 OR 0x0020
+
+         ; Clear bit 3 of R0
+         LOAD R2, 0x0008      ; R2 <- 0x0008 (bit 3 mask)
+         NOT R2               ; R2 <- 0xFFF7
+         AND R0, R2           ; R0 <- R0 AND 0xFFF7
+
+     Example 4.5.3: Extracting Byte Values
+
+         ; Extract high byte of R0 into R1
+         MOV R1, R0           ; R1 <- R0
+         SHR R1, 8            ; R1 <- R1 >> 8
+
+         ; Extract low byte of R0 into R2
+         LOAD R3, 0x00FF      ; R3 <- 0x00FF (mask)
+         MOV R2, R0           ; R2 <- R0
+         AND R2, R3           ; R2 <- R2 AND 0x00FF
+
+4.6  MULTIPLICATION AND DIVISION
+
+     Example 4.6.1: Multiply by Power of 2
+
+         ; Multiply R0 by 8 (shift left 3 times)
+         SHL R0, 3            ; R0 <- R0 * 8
+
+     Example 4.6.2: Divide by Power of 2
+
+         ; Divide R0 by 4 (shift right 2 times)
+         SHR R0, 2            ; R0 <- R0 / 4
+
+     Example 4.6.3: General Multiplication (R0 = R0 * R1)
+
+         ; Multiply R0 by R1 using repeated addition
+         PUSH R2              ; Save R2
+         PUSH R3              ; Save R3
+         MOV R2, R0           ; R2 <- multiplicand
+         MOV R3, R1           ; R3 <- multiplier (counter)
+         LOAD R0, 0           ; R0 <- 0 (result)
+mult_loop:
+         CMP R3, R0           ; Compare counter with 0
+         JZ mult_done         ; Done if counter == 0
+         ADD R0, R2           ; R0 <- R0 + multiplicand
+         LOAD R1, 1           ; R1 <- 1
+         SUB R3, R1           ; R3 <- R3 - 1
+         JMP mult_loop
+mult_done:
+         POP R3               ; Restore R3
+         POP R2               ; Restore R2
+         HALT
+
+4.7  ARRAY OPERATIONS
+
+     Example 4.7.1: Array Initialization
+
+         ; Initialize array at address 1000 with values 1, 2, 3
+         LOAD R0, 1000        ; R0 <- base address
+         LOAD R1, 1           ; R1 <- 1
+         STR R0, R1           ; [1000] <- 1
+         LOAD R2, 2           ; R2 <- 2
+         ADD R0, R2           ; R0 <- 1002
+         STR R0, R2           ; [1002] <- 2
+         LOAD R3, 3           ; R3 <- 3
+         ADD R0, R2           ; R0 <- 1004
+         STR R0, R3           ; [1004] <- 3
+
+     Example 4.7.2: Array Sum
+
+         ; Sum array of 5 elements starting at address 1000
+         LOAD R0, 0           ; R0 <- 0 (sum)
+         LOAD R1, 1000        ; R1 <- 1000 (address)
+         LOAD R2, 5           ; R2 <- 5 (count)
+         LOAD R3, 2           ; R3 <- 2 (increment)
+sum_loop:
+         LDR R4, R1           ; R4 <- [R1]
+         ADD R0, R4           ; R0 <- R0 + R4
+         ADD R1, R3           ; R1 <- R1 + 2 (next element)
+         LOAD R5, 1           ; R5 <- 1
+         SUB R2, R5           ; R2 <- R2 - 1
+         JNZ sum_loop         ; Loop if count != 0
+         HALT                 ; R0 contains sum
+
+
+                                    SECTION 5
+                            TECHNICAL SPECIFICATIONS
+
+--------------------------------------------------------------------------------
+
+5.1  PROCESSOR SPECIFICATIONS
+
+     Architecture:             16-bit RISC
+     Data Bus Width:           16 bits
+     Address Bus Width:        16 bits
+     General Purpose Registers: 8 (R0-R7)
+     Register Width:           16 bits
+     Program Counter:          16 bits
+     Stack Pointer:            16 bits
+     Flags Register:           16 bits (3 bits used)
+
+5.2  MEMORY SPECIFICATIONS
+
+     Address Space:            64 KB (65,536 bytes)
+     Addressable Range:        0x0000 - 0xFFFF
+     Word Size:                16 bits (2 bytes)
+     Byte Order:               Little-endian
+     Alignment:                Even-aligned recommended
+
+5.3  INSTRUCTION SET
+
+     Total Instructions:       23
+     Instruction Word Size:    16 bits
+     Instruction Formats:      2 (Register, Jump)
+     Two-Word Instructions:    2 (LOAD, CALL)
+     Addressing Modes:         Immediate, Register, Indirect
+
+5.4  TIMING SPECIFICATIONS
+
+     Clock Frequency:          Implementation dependent
+     Instruction Cycles:       1 cycle (typical)
+     Memory Access:            1+ cycles (memory dependent)
+     Stack Operations:         1+ cycles (memory dependent)
+
+5.5  CONDITION FLAGS
+
+     Zero Flag (Z):            Bit 0
+     Negative Flag (N):        Bit 1
+     Overflow Flag (O):        Bit 2
+     Reserved:                 Bits 3-15
+
+5.6  POWER REQUIREMENTS
+
+     Operating Voltage:        +5V DC ±5%
+     Power Consumption:        Implementation dependent
+     Operating Temperature:    0°C to 70°C
+     Storage Temperature:      -40°C to 85°C
+
+
+                                   APPENDIX A
+                              INSTRUCTION ENCODING
+
+--------------------------------------------------------------------------------
+
+A.1  OPCODE TABLE
+
+     Opcode  Mnemonic  Format  Description
+     ------  --------  ------  ------------------------------------
+     0x00    NOP       R       No operation
+     0x01    LOAD      R*      Load immediate (2-word)
+     0x02    MOV       R       Move register to register
+     0x03    ADD       R       Add registers
+     0x04    SUB       R       Subtract registers
+     0x05    AND       R       Bitwise AND
+     0x06    OR        R       Bitwise OR
+     0x07    XOR       R       Bitwise XOR
+     0x08    NOT       R       Bitwise NOT
+     0x09    SHL       R       Shift left logical
+     0x0A    SHR       R       Shift right logical
+     0x0B    CMP       R       Compare registers
+     0x0C    JMP       J       Unconditional jump
+     0x0D    JZ        J       Jump if zero
+     0x0E    JNZ       J       Jump if not zero
+     0x0F    JN        J       Jump if negative
+     0x10    LDR       R       Load from memory
+     0x11    STR       R       Store to memory
+     0x12    PUSH      R       Push onto stack
+     0x13    POP       R       Pop from stack
+     0x14    CALL      R*      Call subroutine (2-word)
+     0x15    RET       R       Return from subroutine
+     0x16    HALT      R       Halt processor
+
+     * Two-word instruction
+
+A.2  INSTRUCTION FORMAT DETAILS
+
+     Format R (Register Format):
+       Bits 15-11: Opcode (5 bits)
+       Bits 10-8:  Destination register (3 bits)
+       Bits 7-5:   Source register (3 bits)
+       Bits 4-0:   Immediate value (5 bits)
+
+     Format J (Jump Format):
+       Bits 15-11: Opcode (5 bits)
+       Bits 10-0:  Jump address (11 bits)
+
+A.3  ENCODING EXAMPLES
+
+     NOP:
+       Binary:  0000 0000 0000 0000
+       Hex:     0x0000
+
+     LOAD R0, 1000:
+       Word 1:  0000 1000 0000 0000  (0x0800)
+       Word 2:  0000 0011 1110 1000  (0x03E8 = 1000)
+
+     ADD R1, R2:
+       Binary:  0001 1001 0100 0000
+       Hex:     0x1940
+
+     JMP 100:
+       Binary:  0110 0000 0110 0100
+       Hex:     0x6064
+
+
+                                   APPENDIX B
+                             QUICK REFERENCE CARD
+
+--------------------------------------------------------------------------------
+
+CPU-16 INSTRUCTION QUICK REFERENCE
+
+DATA MOVEMENT                    ARITHMETIC
+  NOP                              ADD   Rd, Rs      Rd <- Rd + Rs
+  LOAD  Rd, #imm    Rd <- imm      SUB   Rd, Rs      Rd <- Rd - Rs
+  MOV   Rd, Rs      Rd <- Rs       CMP   Rd, Rs      Rd - Rs (flags only)
+  LDR   Rd, Rs      Rd <- [Rs]
+  STR   Rd, Rs      [Rd] <- Rs   LOGICAL
+                                   AND   Rd, Rs      Rd <- Rd AND Rs
+CONTROL FLOW                       OR    Rd, Rs      Rd <- Rd OR Rs
+  JMP   addr        PC <- addr     XOR   Rd, Rs      Rd <- Rd XOR Rs
+  JZ    addr        Jump if Z=1    NOT   Rd          Rd <- NOT Rd
+  JNZ   addr        Jump if Z=0
+  JN    addr        Jump if N=1  SHIFT
+                                   SHL   Rd, #cnt    Rd <- Rd << cnt
+SUBROUTINE                         SHR   Rd, #cnt    Rd <- Rd >> cnt
+  CALL  addr        Call routine
+  RET               Return        STACK
+                                   PUSH  Rs          [--SP] <- Rs
+SYSTEM                             POP   Rd          Rd <- [SP++]
+  HALT              Stop CPU
+
+FLAGS: Z (Zero)  N (Negative)  O (Overflow)
+
+REGISTERS: R0, R1, R2, R3, R4, R5, R6, R7 (16-bit general purpose)
+           PC (Program Counter)  SP (Stack Pointer)  FLAGS
+
+MEMORY: 64 KB (0x0000 - 0xFFFF), 16-bit words, little-endian
+
+
+                                   APPENDIX C
+                       ERROR CODES AND TROUBLESHOOTING
+
+--------------------------------------------------------------------------------
+
+C.1  COMMON PROGRAMMING ERRORS
+
+     STACK OVERFLOW
+       Symptom:    Program crashes or behaves erratically
+       Cause:      Too many PUSH/CALL operations without POP/RET
+       Solution:   Initialize SP to high memory address (e.g., 0xFFFF)
+                   Balance all PUSH/POP and CALL/RET operations
+                   Reduce recursion depth or local variable usage
+
+     UNBALANCED STACK
+       Symptom:    RET jumps to wrong address
+       Cause:      Mismatched PUSH/POP operations
+       Solution:   Ensure every PUSH has a corresponding POP
+                   Pop registers in reverse order of pushing
+
+     INFINITE LOOP
+       Symptom:    Program never halts
+       Cause:      Loop condition never becomes false
+       Solution:   Verify loop counter is modified correctly
+                   Check conditional jump logic
+                   Ensure CMP is performed before conditional jump
+
+     WRONG JUMP TARGET
+       Symptom:    Program jumps to unexpected location
+       Cause:      Jump address exceeds 11-bit limit (>2047)
+       Solution:   Use CALL for addresses beyond 2047
+                   Reorganize code to keep jump targets nearby
+                   Use indirect jumps through registers
+
+C.2  DEBUGGING TECHNIQUES
+
+     REGISTER INSPECTION
+       After each operation, verify register contents match expected values.
+       Use memory dumps to examine register state at specific points.
+
+     SINGLE STEPPING
+       Execute one instruction at a time to isolate problematic code.
+       Monitor flags after arithmetic and logical operations.
+
+     BREAKPOINTS
+       Set breakpoints at key locations (loop entry, subroutine calls).
+       Examine register and memory state at breakpoints.
+
+     MEMORY DUMPS
+       Inspect memory contents to verify data storage and retrieval.
+       Check stack area for proper PUSH/POP operation.
+
+C.3  PERFORMANCE OPTIMIZATION
+
+     USE APPROPRIATE INSTRUCTIONS
+       Clear register:     SUB R0, R0  (not LOAD R0, 0)
+       Double value:       ADD R0, R0  (not SHL R0, 1 if flags needed)
+       Test for zero:      CMP R0, R0  sets Z flag
+
+     MINIMIZE MEMORY ACCESS
+       Keep frequently used values in registers
+       Avoid unnecessary LDR/STR operations
+       Use registers for loop counters
+
+     OPTIMIZE LOOPS
+       Place most likely branch target immediately after conditional jump
+       Unroll small loops when code space permits
+       Use countdown loops (compare with zero) when possible
+
+     EFFICIENT SUBROUTINES
+       Only save/restore registers that are modified
+       Use leaf subroutines (no CALL) when possible
+       Inline small subroutines to avoid CALL/RET overhead
+
+C.4  ASSEMBLY TIPS
+
+     LABEL USAGE
+       Use descriptive labels for code clarity
+       Labels must end with colon (:) on separate line
+       Labels are case-sensitive
+
+     COMMENTS
+       Begin comments with semicolon (;)
+       Comment complex algorithms and register usage
+       Document subroutine parameters and return values
+
+     CODE ORGANIZATION
+       Place subroutines after main program
+       Group related subroutines together
+       Use consistent indentation for readability
+
+C.5  HARDWARE CONSIDERATIONS
+
+     MEMORY TIMING
+       Slower memory may require wait states
+       Memory access instructions (LDR, STR) may take multiple cycles
+       Consider memory speed when calculating program timing
+
+     STACK PLACEMENT
+       Place stack in fast memory if available
+       Ensure adequate stack space for deepest call chain
+       Monitor stack usage during development
+
+     INITIALIZATION
+       Always initialize SP before using stack operations
+       Clear registers at program start if needed
+       Set up memory-mapped I/O before use (if applicable)
+
+
+                              END OF MANUAL
+
+
+         This manual is subject to change without notice. Please check with
+         your distributor for the latest revision.
+
+================================================================================
